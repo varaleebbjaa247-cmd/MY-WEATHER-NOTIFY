@@ -2,9 +2,9 @@ name: Daily Rain Notification
 
 on:
   schedule:
-    # 22:30 UTC = 05:30 AM (เวลาประเทศไทย UTC+7)
+    # 22:30 UTC = 05:30 AM เวลาไทย (UTC+7)
     - cron: '30 22 * * *'
-  workflow_dispatch: # ปุ่มสำหรับกดรันสั่งงานด้วยมือทันทีใน GitHub
+  workflow_dispatch:
 
 jobs:
   notify:
@@ -25,5 +25,6 @@ jobs:
 
       - name: Run Weather Notification
         env:
-          LINE_NOTIFY_TOKEN: ${{ secrets.LINE_NOTIFY_TOKEN }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         run: python main.py
