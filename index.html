@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ตั้งค่าระบบแจ้งเตือนฝนตก LINE</title>
+    <style>
+        body { font-family: 'Tahoma', sans-serif; background-color: #f4f6f9; padding: 20px; }
+        .card { max-width: 500px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h2 { color: #2c3e50; text-align: center; }
+        label { font-weight: bold; margin-top: 15px; display: block; }
+        select, input { width: 100%; padding: 10px; margin-top: 5px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; }
+        button { width: 100%; background: #07c160; color: white; border: none; padding: 12px; margin-top: 20px; border-radius: 6px; font-size: 16px; cursor: pointer; }
+        button:hover { background: #06ad56; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>⚙️ ตั้งค่าการแจ้งเตือนฝนตก</h2>
+    
+    <label for="scale">ระดับพื้นที่ (Scale):</label>
+    <select id="scale" onchange="updateLocationList()">
+        <option value="region">ระดับภูมิภาค (ตัวแทนภาค)</option>
+        <option value="province">ระดับจังหวัด</option>
+        <option value="district">ระดับอำเภอ/เขต</option>
+        <option value="subdistrict">ระดับตำบล/แขวง</option>
+    </select>
+
+    <label for="locationSelect">เลือกพื้นที่:</label>
+    <select id="locationSelect"></select>
+
+    <label for="threshold">ตั้งค่าเกณฑ์ฝนตก (n %):</label>
+    <input type="number" id="threshold" value="60" min="0" max="100">
+
+    <button onclick="downloadConfig()">💾 ดาวน์โหลด config.json เพื่ออัปเดต GitHub</button>
+</div>
+
+<script>
+const locations = {
+    region: [
+        { name: "ภาคเหนือ (เชียงใหม่)", lat: 18.7883, lon: 98.9853 },
+        { name: "ภาคกลาง (กรุงเทพฯ)", lat: 13.7563, lon: 100.5018 },
+        { name: "ภาคใต้ (ภูเก็ต)", lat: 7.8804, lon: 98.3923 }
+    ],
+    province: [
+        { name: "จังหวัดเชียงใหม่", lat: 18.7883, lon: 98.9853 },
+        { name: "จังหวัดขอนแก่น", lat: 16.4322, lon: 102.8236 },
+        { name: "จังหวัดชลบุรี", lat: 13.3611, lon: 100.9847 }
+    ],
+    district: [
+        { name: "อำเภอเมืองเชียงใหม่", lat: 18.7883, lon: 98.9853 },
+        { name: "เขตบางรัก (กรุงเทพฯ)", lat: 13.7258, lon: 100.5238 },
+        { name: "อำเภอหัวหิน", lat: 12.5684, lon: 99.9577 }
+    ],
+    subdistrict: [
+        { name: "ตำบลสุเทพ (เชียงใหม่)", lat: 18.7912, lon: 98.9567 },
+        { name: "แขวงสีลม (กรุงเทพฯ)", lat: 13.7268, lon: 100.5312 }
+    ]
+};
+
+function updateLocationList() {
+    const scale = document.getElementById("scale").value;
+    const select = document.getElementById("locationSelect");
+    select.innerHTML = "";
+    locations[scale].forEach(item => {
+        let opt = document.createElement("option");
+        opt.value = JSON.stringify(item);
+        opt.textContent = item.name;
+        select.appendChild(opt);
+    });
+}
+
+function downloadConfig() {
+    const selectedLoc = JSON.parse(document.getElementById("locationSelect").value);
+    const thresholdVal = parseInt(document.getElementById("threshold").value);
+
+    const configData = {
+        threshold: thresholdVal,
+        location: selectedLoc
+    };
+
+    const blob = new Blob([JSON.stringify(configData, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "config.json";
+    a.click();
+}
+
+// Initial setup
+updateLocationList();
+</script>
+
+</body>
+</html>
