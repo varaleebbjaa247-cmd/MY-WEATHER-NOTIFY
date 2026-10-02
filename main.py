@@ -1,7 +1,6 @@
 import json
 import requests
 import os
-from datetime import datetime
 
 def load_config():
     with open("config.json", "r", encoding="utf-8") as f:
@@ -12,12 +11,12 @@ def get_accurate_rain_data(lat, lon):
     url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=precipitation_probability&daily=precipitation_sum&timezone=Asia%2FBangkok"
     res = requests.get(url).json()
     
-    # 1. [วิธีที่ 1] หา % ฝนตกสูงสุด เฉพาะช่วงเวลา 06:00 - 18:00 น. ของวันนี้
-    hourly_probabilities = res["hourly"]["precipitation_probability"][:24] # ข้อมูล 24 ชม. ของวันนี้
-    daytime_probabilities = hourly_probabilities[6:19] # ดึงเฉพาะช่วง 06:00 น. ถึง 18:00 น.
+    # 1. หา % ฝนตกสูงสุด เฉพาะช่วงเวลา 06:00 - 18:00 น. ของวันนี้
+    hourly_probabilities = res["hourly"]["precipitation_probability"][:24]
+    daytime_probabilities = hourly_probabilities[6:19]
     max_daytime_n = max(daytime_probabilities) if daytime_probabilities else 0
 
-    # 2. [วิธีที่ 2] ดึงปริมาณน้ำฝนสะสมรวมของวันนี้ (มิลลิเมตร)
+    # 2. ดึงปริมาณน้ำฝนสะสมรวมของวันนี้ (มิลลิเมตร)
     rain_mm = res["daily"]["precipitation_sum"][0]
 
     return max_daytime_n, rain_mm
@@ -47,14 +46,28 @@ def main():
     lat = config["location"]["lat"]
     lon = config["location"]["lon"]
 
+    # URL หน้าเว็บตั้งค่าของคุณ
+    setting_url = "https://varaleebbjaa247-cmd.github.io/MY-WEATHER-NOTIFY/"
+
     # ดึงค่า % ฝนช่วงกลางวัน (n) และปริมาณน้ำฝนสะสม (rain_mm)
     n, rain_mm = get_accurate_rain_data(lat, lon)
 
-    # เงื่อนไขรวม: % ฝนช่วงกลางวัน (6:00-18:00) >= threshold AND ปริมาณฝนรวม >= 0.5 มม.
+    # สร้างข้อความพร้อมแนบ URL แก้ไขตั้งค่าด้านล่าง
     if n >= threshold and rain_mm >= 0.5:
-        msg = f"📍 พื้นที่: {location_name}\nวันนี้ช่วง 06:00-18:00 น. มีโอกาสเกิดฝนสูงสุด {n}%\n(คาดการณ์ปริมาณฝนสะสม {rain_mm} มม.)\nแนะนำให้พกร่มก่อนออกจากบ้านนะครับ ☔"
+        msg = (
+            f"📍 พื้นที่: {location_name}\n"
+            f"วันนี้ช่วง 06:00-18:00 น. มีโอกาสเกิดฝนสูงสุด {n}%\n"
+            f"(คาดการณ์ปริมาณฝนสะสม {rain_mm} มม.)\n"
+            f"แนะนำให้พกร่มก่อนออกจากบ้านนะครับ ☔\n\n"
+            f"✏️ แก้ไขตั้งค่าแจ้งเตือน:\n{setting_url}"
+        )
     else:
-        msg = f"📍 พื้นที่: {location_name}\nวันนี้ช่วง 06:00-18:00 น. มีโอกาสเกิดฝน {n}%\nหากจะออกจากบ้านไม่ต้องพกร่มก็ได้ครับ ☀️"
+        msg = (
+            f"📍 พื้นที่: {location_name}\n"
+            f"วันนี้ช่วง 06:00-18:00 น. มีโอกาสเกิดฝน {n}%\n"
+            f"หากจะออกจากบ้านไม่ต้องพกร่มก็ได้ครับ ☀️\n\n"
+            f"✏️ แก้ไขตั้งค่าแจ้งเตือน:\n{setting_url}"
+        )
 
     # รับค่าการตรวจสอบสิทธิ์จาก GitHub Secrets
     line_access_token = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
