@@ -53,7 +53,7 @@ def main():
     n, rain_mm = get_accurate_rain_data(lat, lon)
 
     # สร้างข้อความพร้อมแนบ URL แก้ไขตั้งค่าด้านล่าง
-    if n >= threshold and rain_mm >= 0.5:
+    if n >= threshold and rain_mm >= 1:
         msg = (
             f"📍 พื้นที่: {location_name}\n"
             f"วันนี้ช่วง 06:00-18:00 น. มีโอกาสเกิดฝนสูงสุด {n}%\n"
