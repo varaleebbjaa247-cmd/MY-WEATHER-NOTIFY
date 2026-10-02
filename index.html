@@ -13,6 +13,7 @@
         button { width: 100%; background: #06c755; color: white; border: none; padding: 12px; margin-top: 25px; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
         button:hover { background: #05b34c; }
         .info-box { background: #e8f4fd; border-left: 4px solid #3498db; padding: 12px; margin-top: 20px; font-size: 14px; color: #2c3e50; border-radius: 4px; }
+        .status-box { margin-top: 15px; font-weight: bold; text-align: center; font-size: 14px; }
         .hint { font-size: 12px; color: #7f8c8d; margin-top: 4px; }
     </style>
 </head>
@@ -33,15 +34,24 @@
     <label for="threshold">2. ตั้งค่าเกณฑ์ฝนตก (n %):</label>
     <input type="number" id="threshold" value="60" min="0" max="100">
 
+    <label for="githubToken">3. GitHub Personal Access Token (PAT):</label>
+    <input type="password" id="githubToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+    <div class="hint">🔑 Token สำหรับยืนยันสิทธิ์เพื่ออัปเดต config.json ลงใน Repository</div>
+
     <div class="info-box" id="selectedInfo">
         📍 <strong>พื้นที่ที่เลือก:</strong> -<br>
         🌐 <strong>พิกัด (Lat, Lon):</strong> -
     </div>
 
-    <button onclick="downloadConfig()">💾 ดาวน์โหลด config.json เพื่ออัปเดต GitHub</button>
+    <button onclick="saveToGitHub()">💾 บันทึกลง GitHub</button>
+    <div id="statusBox" class="status-box"></div>
 </div>
 
 <script>
+const GITHUB_USERNAME = "varaleebbjaa247-cmd";
+const REPO_NAME = "MY-WEATHER-NOTIFY";
+const FILE_PATH = "config.json";
+
 const REGIONS = [
     { name: "ภาคเหนือ", lat: 18.7883, lon: 98.9853 },
     { name: "ภาคกลาง", lat: 13.7563, lon: 100.5018 },
@@ -165,8 +175,7 @@ function handleScaleChange() {
                     <label>Longitude (ลองจิจูด):</label>
                     <input type="number" step="any" id="customLon" placeholder="เช่น 104.7236" oninput="updateCustomSelection()">
                 </div>
-            </div>
-            <div class="hint">💡 สามารถเปิด Google Maps ค้นหาอำเภอ/ตำบล แล้วก๊อปปี้พิกัดมาวางได้ครับ</div>`;
+            </div>`;
         container.innerHTML = html;
         updateCustomSelection();
     }
@@ -204,21 +213,80 @@ function displayInfo() {
     `;
 }
 
-function downloadConfig() {
+async function saveToGitHub() {
+    const token = document.getElementById("githubToken").value.trim();
+    const statusBox = document.getElementById("statusBox");
+
+    if (!token) {
+        statusBox.style.color = "red";
+        statusBox.innerText = "⚠️ กรุณากรอก GitHub Personal Access Token ก่อนบันทึกครับ";
+        return;
+    }
+
+    statusBox.style.color = "#3498db";
+    statusBox.innerText = "⏳ กำลังส่งข้อมูลไปยัง GitHub...";
+
     const thresholdVal = parseInt(document.getElementById("threshold").value);
     const configData = {
         threshold: thresholdVal,
         location: selectedLocation
     };
 
-    const blob = new Blob([JSON.stringify(configData, null, 2)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "config.json";
-    a.click();
+    const contentString = JSON.stringify(configData, null, 2);
+    // แปลงข้อความ JSON เป็น Base64 (รองรับอักขระภาษาไทย)
+    const contentBase64 = btoa(unescape(encodeURIComponent(contentString)));
+
+    const url = `https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${FILE_PATH}`;
+
+    try {
+        // 1. ดึง sha ของไฟล์ config.json เดิม
+        let currentSha = null;
+        const getRes = await fetch(url, {
+            headers: {
+                "Authorization": `token ${token}`,
+                "Accept": "application/vnd.github.v3+json"
+            }
+        });
+
+        if (getRes.ok) {
+            const fileData = await getRes.json();
+            currentSha = fileData.sha;
+        }
+
+        // 2. ส่งคำสั่งบันทึกอัปเดตไฟล์
+        const bodyData = {
+            message: "Update config.json via web app",
+            content: contentBase64
+        };
+        if (currentSha) {
+            bodyData.sha = currentSha;
+        }
+
+        const putRes = await fetch(url, {
+            method: "PUT",
+            headers: {
+                "Authorization": `token ${token}`,
+                "Content-Type": "application/json",
+                "Accept": "application/vnd.github.v3+json"
+            },
+            body: JSON.stringify(bodyData)
+        });
+
+        if (putRes.ok) {
+            statusBox.style.color = "#2ecc71";
+            statusBox.innerText = "✅ บันทึกข้อมูลลง GitHub เรียบร้อยแล้ว!";
+        } else {
+            const errData = await putRes.json();
+            statusBox.style.color = "#e74c3c";
+            statusBox.innerText = "❌ บันทึกไม่สำเร็จ: " + (errData.message || "Token ไม่ถูกต้อง หรือไม่มีสิทธิ์");
+        }
+    } catch (err) {
+        statusBox.style.color = "#e74c3c";
+        statusBox.innerText = "❌ เกิดข้อผิดพลาด: " + err.message;
+    }
 }
 
-// เริ่มต้นทำงาน
+// เริ่มต้นการทำงาน
 handleScaleChange();
 </script>
 
