@@ -1,9 +1,9 @@
 name: Daily Rain Notification
 
-#on:
+on:
   schedule:
-    # 22:30 UTC = 05:30 AM เวลาไทย (UTC+7)
-    #- cron: '30 22 * * *'
+     22:30 UTC = 05:30 AM เวลาไทย (UTC+7)
+    - cron: '30 22 * * *'
   workflow_dispatch:
 
 jobs:
