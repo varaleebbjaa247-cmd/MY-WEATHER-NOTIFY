@@ -5,16 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ตั้งค่าระบบแจ้งเตือนฝนตก LINE</title>
     <style>
-        body { font-family: 'Kanit', 'Tahoma', sans-serif; background-color: #f4f6f9; padding: 20px; }
+        body { font-family: 'Tahoma', 'Segoe UI', sans-serif; background-color: #f4f6f9; padding: 20px; }
         .card { max-width: 550px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         h2 { color: #2c3e50; text-align: center; margin-bottom: 20px; }
         label { font-weight: bold; margin-top: 15px; display: block; color: #34495e; }
         select, input { width: 100%; padding: 10px; margin-top: 5px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; font-size: 14px; }
-        .row { display: flex; gap: 10px; }
-        .row > div { flex: 1; }
         button { width: 100%; background: #06c755; color: white; border: none; padding: 12px; margin-top: 25px; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
         button:hover { background: #05b34c; }
-        .info-box { background: #e8f4fd; border-left: 4px solid #3498db; padding: 10px; margin-top: 15px; font-size: 13px; color: #2c3e50; }
+        .info-box { background: #e8f4fd; border-left: 4px solid #3498db; padding: 12px; margin-top: 20px; font-size: 14px; color: #2c3e50; border-radius: 4px; }
+        .hint { font-size: 12px; color: #7f8c8d; margin-top: 4px; }
     </style>
 </head>
 <body>
@@ -25,28 +24,24 @@
     <label for="scale">1. เลือกสเกลระดับพื้นที่:</label>
     <select id="scale" onchange="handleScaleChange()">
         <option value="region">ระดับภูมิภาค</option>
-        <option value="province">ระดับจังหวัด</option>
-        <option value="district">ระดับอำเภอ/เขต</option>
-        <option value="subdistrict">ระดับตำบล/แขวง</option>
+        <option value="province" selected>ระดับจังหวัด (77 จังหวัด)</option>
+        <option value="custom">ระบุพิกัดเอง (Lat, Lon)</option>
     </select>
 
-    <!-- ส่วนเลือกพื้นที่ตามสเกล -->
-    <div id="selectorContainer">
-        <!-- จะถูกเติมด้วย JavaScript -->
-    </div>
+    <div id="selectorContainer"></div>
 
     <label for="threshold">2. ตั้งค่าเกณฑ์ฝนตก (n %):</label>
     <input type="number" id="threshold" value="60" min="0" max="100">
 
     <div class="info-box" id="selectedInfo">
-        📍 **พื้นที่ที่เลือก:** กำลังโหลดข้อมูล...
+        📍 <strong>พื้นที่ที่เลือก:</strong> -<br>
+        🌐 <strong>พิกัด (Lat, Lon):</strong> -
     </div>
 
     <button onclick="downloadConfig()">💾 ดาวน์โหลด config.json เพื่ออัปเดต GitHub</button>
 </div>
 
 <script>
-// ข้อมูลพิกัดภูมิภาค (ตัวแทนภาค)
 const REGIONS = [
     { name: "ภาคเหนือ", lat: 18.7883, lon: 98.9853 },
     { name: "ภาคกลาง", lat: 13.7563, lon: 100.5018 },
@@ -56,19 +51,87 @@ const REGIONS = [
     { name: "ภาคตะวันตก", lat: 14.0227, lon: 99.5328 }
 ];
 
-let rawData = []; // เก็บข้อมูล จังหวัด/อำเภอ/ตำบล ทั้งหมดจาก API
-let selectedLocation = { name: "", lat: 0, lon: 0 };
+const PROVINCES = [
+    { name: "กรุงเทพมหานคร", lat: 13.7563, lon: 100.5018 },
+    { name: "กระบี่", lat: 8.0863, lon: 98.9063 },
+    { name: "กาญจนบุรี", lat: 14.0227, lon: 99.5328 },
+    { name: "กาฬสินธุ์", lat: 16.4322, lon: 103.5061 },
+    { name: "กำแพงเพชร", lat: 16.4828, lon: 99.5227 },
+    { name: "ขอนแก่น", lat: 16.4322, lon: 102.8236 },
+    { name: "จันทบุรี", lat: 12.6114, lon: 102.1039 },
+    { name: "ฉะเชิงเทรา", lat: 13.6904, lon: 101.0779 },
+    { name: "ชลบุรี", lat: 13.3611, lon: 100.9847 },
+    { name: "ชัยนาท", lat: 15.1852, lon: 100.1251 },
+    { name: "ชัยภูมิ", lat: 15.8105, lon: 102.0288 },
+    { name: "ชุมพร", lat: 10.4930, lon: 99.1800 },
+    { name: "เชียงราย", lat: 19.9105, lon: 99.8406 },
+    { name: "เชียงใหม่", lat: 18.7883, lon: 98.9853 },
+    { name: "ตรัง", lat: 7.5563, lon: 99.6114 },
+    { name: "ตราด", lat: 12.2428, lon: 102.5175 },
+    { name: "ตาก", lat: 16.8839, lon: 99.1258 },
+    { name: "นครนายก", lat: 14.2069, lon: 101.2131 },
+    { name: "นครปฐม", lat: 13.8196, lon: 100.0373 },
+    { name: "นครพนม", lat: 17.3994, lon: 104.7694 },
+    { name: "นครราชสีมา", lat: 14.9799, lon: 102.0978 },
+    { name: "นครศรีธรรมราช", lat: 8.4304, lon: 99.9631 },
+    { name: "นครสวรรค์", lat: 15.7023, lon: 100.1372 },
+    { name: "นนทบุรี", lat: 13.8591, lon: 100.5217 },
+    { name: "นราธิวาส", lat: 6.4255, lon: 101.8253 },
+    { name: "น่าน", lat: 18.7838, lon: 100.7782 },
+    { name: "บึงกาฬ", lat: 18.3614, lon: 103.6528 },
+    { name: "บุรีรัมย์", lat: 14.9930, lon: 103.1029 },
+    { name: "ปทุมธานี", lat: 14.0208, lon: 100.5250 },
+    { name: "ประจวบคีรีขันธ์", lat: 11.8124, lon: 99.7973 },
+    { name: "ปราจีนบุรี", lat: 14.0509, lon: 101.3730 },
+    { name: "ปัตตานี", lat: 6.8663, lon: 101.2503 },
+    { name: "พระนครศรีอยุธยา", lat: 14.3532, lon: 100.5684 },
+    { name: "พะเยา", lat: 19.1657, lon: 99.9022 },
+    { name: "พังงา", lat: 8.4501, lon: 98.5255 },
+    { name: "พัทลุง", lat: 7.6167, lon: 100.0833 },
+    { name: "พิจิตร", lat: 16.4421, lon: 100.3482 },
+    { name: "พิษณุโลก", lat: 16.8211, lon: 100.2659 },
+    { name: "เพชรบุรี", lat: 13.1069, lon: 99.9447 },
+    { name: "เพชรบูรณ์", lat: 16.4190, lon: 101.1593 },
+    { name: "แพร่", lat: 18.1446, lon: 100.1403 },
+    { name: "ภูเก็ต", lat: 7.8804, lon: 98.3923 },
+    { name: "มหาสารคาม", lat: 16.1851, lon: 103.3007 },
+    { name: "มุกดาหาร", lat: 16.5436, lon: 104.7236 },
+    { name: "แม่ฮ่องสอน", lat: 19.3021, lon: 97.9654 },
+    { name: "ยโสธร", lat: 15.7924, lon: 104.1453 },
+    { name: "ยะลา", lat: 6.5411, lon: 101.2813 },
+    { name: "ร้อยเอ็ด", lat: 16.0538, lon: 103.6520 },
+    { name: "ระนอง", lat: 9.9658, lon: 98.6348 },
+    { name: "ระยอง", lat: 12.6814, lon: 101.2816 },
+    { name: "ราชบุรี", lat: 13.5373, lon: 99.8134 },
+    { name: "ลพบุรี", lat: 14.7995, lon: 100.6534 },
+    { name: "ลำปาง", lat: 18.2888, lon: 99.4922 },
+    { name: "ลำพูน", lat: 18.5745, lon: 99.0087 },
+    { name: "เลย", lat: 17.4860, lon: 101.7223 },
+    { name: "ศรีสะเกษ", lat: 15.1186, lon: 104.3220 },
+    { name: "สกลนคร", lat: 17.1542, lon: 104.1350 },
+    { name: "สงขลา", lat: 7.1988, lon: 100.5951 },
+    { name: "สตูล", lat: 6.6238, lon: 100.0674 },
+    { name: "สมุทรปราการ", lat: 13.5991, lon: 100.5998 },
+    { name: "สมุทรสงคราม", lat: 13.4098, lon: 100.0023 },
+    { name: "สมุทรสาคร", lat: 13.5475, lon: 100.2744 },
+    { name: "สระแก้ว", lat: 13.8240, lon: 102.0725 },
+    { name: "สระบุรี", lat: 14.5289, lon: 100.9108 },
+    { name: "สิงห์บุรี", lat: 14.8936, lon: 100.3967 },
+    { name: "สุโขทัย", lat: 17.0078, lon: 99.8230 },
+    { name: "สุพรรณบุรี", lat: 14.4745, lon: 100.1177 },
+    { name: "สุราษฎร์ธานี", lat: 9.1382, lon: 99.3217 },
+    { name: "สุรินทร์", lat: 14.8818, lon: 103.4936 },
+    { name: "หนองคาย", lat: 17.8783, lon: 102.7420 },
+    { name: "หนองบัวลำภู", lat: 17.2038, lon: 102.4410 },
+    { name: "อ่างทอง", lat: 14.5896, lon: 100.4550 },
+    { name: "อำนาจเจริญ", lat: 15.8582, lon: 104.6258 },
+    { name: "อุดรธานี", lat: 17.4138, lon: 102.7872 },
+    { name: "อุตรดิตถ์", lat: 17.6201, lon: 100.0993 },
+    { name: "อุทัยธานี", lat: 15.3835, lon: 100.0246 },
+    { name: "อุบลราชธานี", lat: 15.2448, lon: 104.8473 }
+];
 
-// ดึงข้อมูลการปกครองไทยจาก Open-source API
-async function fetchThailandData() {
-    try {
-        const response = await fetch('https://raw.githubusercontent.com/kongvut/thai-province-data/master/api_province_with_amphure_tambon.json');
-        rawData = await response.json();
-        handleScaleChange();
-    } catch (error) {
-        alert("ไม่สามารถโหลดข้อมูลที่อยู่อาศัยได้ กรุณาลองใหม่อีกครั้ง");
-    }
-}
+let selectedLocation = { name: "", lat: 0, lon: 0 };
 
 function handleScaleChange() {
     const scale = document.getElementById("scale").value;
@@ -77,99 +140,38 @@ function handleScaleChange() {
 
     if (scale === "region") {
         let html = `<label>เลือกภูมิภาค:</label><select id="regionSelect" onchange="updateRegionSelection()">`;
-        REGIONS.forEach((r, idx) => {
-            html += `<option value="${idx}">${r.name}</option>`;
-        });
+        REGIONS.forEach((r, idx) => { html += `<option value="${idx}">${r.name}</option>`; });
         html += `</select>`;
         container.innerHTML = html;
         updateRegionSelection();
 
     } else if (scale === "province") {
         let html = `<label>เลือกจังหวัด:</label><select id="provinceSelect" onchange="updateProvinceSelection()">`;
-        rawData.forEach((p) => {
-            html += `<option value="${p.id}">${p.name_th}</option>`;
-        });
+        PROVINCES.forEach((p, idx) => { html += `<option value="${idx}">${p.name}</option>`; });
         html += `</select>`;
         container.innerHTML = html;
         updateProvinceSelection();
 
-    } else if (scale === "district") {
+    } else if (scale === "custom") {
         let html = `
-            <div class="row">
-                <div>
-                    <label>จังหวัด:</label>
-                    <select id="provinceSelect" onchange="loadAmphures()"></select>
+            <label>ชื่อสถานที่ / อำเภอ / ตำบล:</label>
+            <input type="text" id="customName" placeholder="เช่น อ.ดอนตาล" oninput="updateCustomSelection()">
+            <div class="row" style="display:flex; gap:10px; margin-top:10px;">
+                <div style="flex:1;">
+                    <label>Latitude (ละติจูด):</label>
+                    <input type="number" step="any" id="customLat" placeholder="เช่น 16.5436" oninput="updateCustomSelection()">
                 </div>
-                <div>
-                    <label>อำเภอ/เขต:</label>
-                    <select id="amphureSelect" onchange="updateDistrictSelection()"></select>
+                <div style="flex:1;">
+                    <label>Longitude (ลองจิจูด):</label>
+                    <input type="number" step="any" id="customLon" placeholder="เช่น 104.7236" oninput="updateCustomSelection()">
                 </div>
-            </div>`;
+            </div>
+            <div class="hint">💡 สามารถเปิด Google Maps ค้นหาอำเภอ/ตำบล แล้วก๊อปปี้พิกัดมาวางได้ครับ</div>`;
         container.innerHTML = html;
-        fillProvinces();
-        loadAmphures();
-
-    } else if (scale === "subdistrict") {
-        let html = `
-            <label>จังหวัด:</label>
-            <select id="provinceSelect" onchange="loadAmphures()"></select>
-            <div class="row">
-                <div>
-                    <label>อำเภอ/เขต:</label>
-                    <select id="amphureSelect" onchange="loadTambons()"></select>
-                </div>
-                <div>
-                    <label>ตำบล/แขวง:</label>
-                    <select id="tambonSelect" onchange="updateSubdistrictSelection()"></select>
-                </div>
-            </div>`;
-        container.innerHTML = html;
-        fillProvinces();
-        loadAmphures();
+        updateCustomSelection();
     }
 }
 
-function fillProvinces() {
-    const pSelect = document.getElementById("provinceSelect");
-    pSelect.innerHTML = "";
-    rawData.forEach((p) => {
-        pSelect.innerHTML += `<option value="${p.id}">${p.name_th}</option>`;
-    });
-}
-
-function loadAmphures() {
-    const pId = parseInt(document.getElementById("provinceSelect").value);
-    const province = rawData.find(p => p.id === pId);
-    const aSelect = document.getElementById("amphureSelect");
-    aSelect.innerHTML = "";
-    
-    province.amphure.forEach((a) => {
-        aSelect.innerHTML += `<option value="${a.id}">${a.name_th}</option>`;
-    });
-
-    if (document.getElementById("scale").value === "district") {
-        updateDistrictSelection();
-    } else {
-        loadTambons();
-    }
-}
-
-function loadTambons() {
-    const pId = parseInt(document.getElementById("provinceSelect").value);
-    const aId = parseInt(document.getElementById("amphureSelect").value);
-    const province = rawData.find(p => p.id === pId);
-    const amphure = province.amphure.find(a => a.id === aId);
-    const tSelect = document.getElementById("tambonSelect");
-    tSelect.innerHTML = "";
-
-    amphure.tambon.forEach((t) => {
-        tSelect.innerHTML += `<option value="${t.id}">${t.name_th}</option>`;
-    });
-
-    updateSubdistrictSelection();
-}
-
-// อัปเดตพิกัดตำแหน่งที่เลือก
 function updateRegionSelection() {
     const idx = document.getElementById("regionSelect").value;
     selectedLocation = REGIONS[idx];
@@ -177,58 +179,33 @@ function updateRegionSelection() {
 }
 
 function updateProvinceSelection() {
-    const pId = parseInt(document.getElementById("provinceSelect").value);
-    const p = rawData.find(item => item.id === pId);
-    // ใช้พิกัดแทนของอำเภอแรกในจังหวัด
-    const sampleAmphure = p.amphure[0];
+    const idx = document.getElementById("provinceSelect").value;
+    const p = PROVINCES[idx];
     selectedLocation = {
-        name: `จังหวัด${p.name_th}`,
-        lat: sampleAmphure.latitude || p.amphure[0].tambon[0].latitude,
-        lon: sampleAmphure.longitude || p.amphure[0].tambon[0].longitude
+        name: `จังหวัด${p.name}`,
+        lat: p.lat,
+        lon: p.lon
     };
     displayInfo();
 }
 
-function updateDistrictSelection() {
-    const pId = parseInt(document.getElementById("provinceSelect").value);
-    const aId = parseInt(document.getElementById("amphureSelect").value);
-    const p = rawData.find(item => item.id === pId);
-    const a = p.amphure.find(item => item.id === aId);
-    
-    selectedLocation = {
-        name: `อำเภอ${a.name_th} จ.${p.name_th}`,
-        lat: a.latitude || a.tambon[0].latitude,
-        lon: a.longitude || a.tambon[0].longitude
-    };
-    displayInfo();
-}
-
-function updateSubdistrictSelection() {
-    const pId = parseInt(document.getElementById("provinceSelect").value);
-    const aId = parseInt(document.getElementById("amphureSelect").value);
-    const tId = parseInt(document.getElementById("tambonSelect").value);
-    const p = rawData.find(item => item.id === pId);
-    const a = p.amphure.find(item => item.id === aId);
-    const t = a.tambon.find(item => item.id === tId);
-
-    selectedLocation = {
-        name: `ตำบล${t.name_th} อ.${a.name_th} จ.${p.name_th}`,
-        lat: t.latitude,
-        lon: t.longitude
-    };
+function updateCustomSelection() {
+    const name = document.getElementById("customName").value || "พื้นที่กำหนดเอง";
+    const lat = parseFloat(document.getElementById("customLat").value) || 0;
+    const lon = parseFloat(document.getElementById("customLon").value) || 0;
+    selectedLocation = { name, lat, lon };
     displayInfo();
 }
 
 function displayInfo() {
     document.getElementById("selectedInfo").innerHTML = `
-        📍 <strong>พิกัดที่เลือก:</strong> ${selectedLocation.name}<br>
-        🌐 <strong>Lat/Lon:</strong> ${selectedLocation.lat}, ${selectedLocation.lon}
+        📍 <strong>พื้นที่ที่เลือก:</strong> ${selectedLocation.name}<br>
+        🌐 <strong>พิกัด (Lat, Lon):</strong> ${selectedLocation.lat}, ${selectedLocation.lon}
     `;
 }
 
 function downloadConfig() {
     const thresholdVal = parseInt(document.getElementById("threshold").value);
-
     const configData = {
         threshold: thresholdVal,
         location: selectedLocation
@@ -241,21 +218,8 @@ function downloadConfig() {
     a.click();
 }
 
-// เริ่มต้นโหลดข้อมูลเมื่อเปิดหน้าเว็บ
-async function fetchThailandData() {
-    try {
-        // เปลี่ยนมาใช้ CDN jsDelivr เพื่อหลีกเลี่ยง CORS
-        const response = await fetch('https://cdn.jsdelivr.net/gh/kongvut/thai-province-data@master/api_province_with_amphure_tambon.json');
-        
-        if (!response.ok) throw new Error('Network response was not ok');
-        
-        rawData = await response.json();
-        handleScaleChange();
-    } catch (error) {
-        console.error("Fetch error:", error);
-        alert("ไม่สามารถโหลดข้อมูลที่อยู่อาศัยได้ กรุณาลองใหม่อีกครั้ง");
-    }
-}
+// เริ่มต้นทำงาน
+handleScaleChange();
 </script>
 
 </body>
